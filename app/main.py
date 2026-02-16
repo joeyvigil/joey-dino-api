@@ -1,5 +1,10 @@
 from fastapi import FastAPI
+from inflect import engine
 from app.routers import dino_router
+from app.services.db_connection import Base
+
+# create db on startup
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
