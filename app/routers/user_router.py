@@ -49,3 +49,39 @@ async def get_user_by_id(user_id:int, db: Session = Depends(get_db)):
 
     # If the user is found, return it
     return user
+
+# update user by ID (path param)
+@router.put("/by_id/{user_id}")
+async def update_user_by_id(user_id:int, updated_user:CreateUserModel, db: Session = Depends(get_db)):
+    # Find the user we want to update
+    user = db.query(UserDBModel).filter(UserDBModel.id == user_id).first()
+
+    # Error handling for user not found
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found!")
+
+    # Update the user's data with the incoming data
+    user.username = updated_user.username
+    user.password = updated_user.password
+
+    # Commit the changes to the DB
+    db.commit()
+    db.refresh(user) # Refresh the user variable to get the updated data from the DB
+
+    return user # Return the updated user to the client
+
+# delete user by ID (path param)
+@router.delete("/by_id/{user_id}")
+async def delete_user_by_id(user_id:int, db: Session = Depends(get_db)):
+    # Find the user we want to delete
+    user = db.query(UserDBModel).filter(UserDBModel.id == user_id).first()
+
+    # Error handling for user not found
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found!")
+
+    # Delete the user and commit the change to the DB
+    db.delete(user)
+    db.commit()
+
+    return {"message":f"User with ID {user_id} has been deleted!"}
