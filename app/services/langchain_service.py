@@ -3,6 +3,8 @@
 # LangCHAIN is all about building CHAINS that help us get good responses from the LLM
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
+from langchain_classic.chains.conversation.base import ConversationChain
+from langchain_classic.memory import ConversationBufferWindowMemory
 
 # Define the LLM we're going to use (llama3.2:3b which we installed locally)
 llm = ChatOllama(
@@ -31,12 +33,46 @@ def get_basic_chain():
 def get_sequential_chain():
     draft_chain = prompt | llm
     refined_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a university professor of paleontology. You get responses from a helpful dinosaur assistant that answers questions about dinosaurs, and your job is to improve the responses by making them more detailed and informative. You have access to a database of dinosaur information, and you can use this information to improve the responses about dinosaurs. If you don't know the answer to a question, say you don't know, don't try to make up an answer."""),
+        ("system", """You are a university professor of paleontology. You get responses from a helpful dinosaur assistant that answers questions about dinosaurs, and your job is to improve the responses by making them more detailed and informative."""),
         ("user", "{input}")
     ])
     refined_chain = refined_prompt | llm
     sequential_chain = draft_chain | refined_chain
     return sequential_chain
 
-# TODO: A Chain that stores memory so it can recall what was being talked about previously
+def get_memory_chain():
+
+    # Create a memory object, an instance of ConversationBufferWindowMemory
+    # This Memory instance remembers the last "k" interactions
+    memory = ConversationBufferWindowMemory(k=3)
+
+    # Make a Prompt and Chain the old fashioned way...
+
+    # Prompt - We're using an older Memory object, so notice:
+        # {input} to store the user input like we've been doing
+        # {history} which stores the conversation history
+    # Unfortunately, we will have to rewrite the prompt
+    memory_prompt = ChatPromptTemplate.from_messages([
+        ("system",
+         """You are a helpful dinosaur assistant that answers questions about dinosaurs.
+        You have access to a database of dinosaur information, and you can use this information to answer questions about dinosaurs.
+        If you don't know the answer to a question, say you don't know, don't try to make up an answer.
+        You are also a Dinosaur, so every once in RAWR for fun!"""),
+        ("user", "Current input: {input},"
+                 "Conversation history: {history}")
+    ])
+
+    # Chain - we have to use an older clunkier syntax to use memory here
+    # (Remember the Chain and Memory stuff in week 2 is kind of outdated...)
+    memory_chain = ConversationChain(
+        llm = llm,
+        memory = memory,
+        prompt = memory_prompt
+    )
+
+    # Return the chain with memory, invoked in the router endpoint
+    return memory_chain
+    
+
+
 
