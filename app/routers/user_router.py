@@ -51,57 +51,67 @@ async def get_user_by_id(user_id:int, db: Session = Depends(get_db)):
     # If the user is found, return it
     return user
 
-# update user by ID (path param)
-@router.put("/by_id/{user_id}")
-async def update_user_by_id(user_id:int, updated_user:CreateUserModel, db: Session = Depends(get_db)):
-    # Find the user we want to update
+# Update user by ID
+@router.put("/{user_id}")
+async def update_user(user_id:int, updated_user: CreateUserModel, db: Session = Depends(get_db)):
+
+    # First, we need to check if the user exists
     user = db.query(UserDBModel).filter(UserDBModel.id == user_id).first()
 
-    # Error handling for user not found
     if not user:
         raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found!")
 
-    # Update the user's data with the incoming data
+    # If the user exists, we can update their info with the incoming data
     user.username = updated_user.username
     user.password = updated_user.password
 
     # Commit the changes to the DB
     db.commit()
-    db.refresh(user) # Refresh the user variable to get the updated data from the DB
+    db.refresh(user)
 
-    return user # Return the updated user to the client
+    # Return the user!
+    return user
 
-# delete user by ID (path param)
-@router.delete("/by_id/{user_id}")
-async def delete_user_by_id(user_id:int, db: Session = Depends(get_db)):
-    # Find the user we want to delete
+
+# Delete user by ID
+@router.delete("/{user_id}")
+async def delete_user(user_id:int, db: Session = Depends(get_db)):
+    # Check if the user exists
     user = db.query(UserDBModel).filter(UserDBModel.id == user_id).first()
 
-    # Error handling for user not found
     if not user:
         raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found!")
 
-    # Delete the user and commit the change to the DB
+    # If the user exists, delete them
     db.delete(user)
     db.commit()
 
-    return {"message":f"User with ID {user_id} has been deleted!"}
+    return {"message": f"User with ID {user_id} deleted!"}
 
-# RAG (Retrieval Augmented Generation) with our llm and user data
-# Augmenting the Generated response based on some data we're retrieving
+
+# RAG (Retrieval Augmented Generated) with our LLM and user data
+# AUGMENTING the GENERATED response based on some data we're RETRIEVING
 @router.post("/rag")
-async def user_rag(user_input:str, db: Session = Depends(get_db)):
-    # get all users as a string
+async def users_rag(user_input:str, db: Session = Depends(get_db)):
+
+    # NOTE: we didn't make user_input a Pydantic model
+    # ...which is fine, but the user's question will come in as a query param
+        # (Instead of a value in the request body)
+
+    # Get all users, convert the info to a string (easier for the LLM)
     users = db.query(UserDBModel).all()
-    user_string = "\n".join([f"User ID: {user.id}, Username: {user.username}, password: {user.password}" for user in users])
-    # ask the LLM a question based on that user info, and return the response
+    user_info = "\n".join([f"ID: {user.id}, Username: {user.username}" for user in users])
+    # This^ looks like: ID: 1, Username: user1
+
     # Get the basic chain from the langchain service
     chain = get_basic_chain()
 
     # Ask the LLM a question based on that user info
     response = chain.invoke(
-        {"input": f"""Here is some information about users in our database: {user_string}
+        {"input": f"""Here is some information about users in our database: {user_info}
             Based on this information, answer the user's query: {user_input} """}
     )
-    return {"response": response}
+
+    # Return the LLM's response!
+    return response
 

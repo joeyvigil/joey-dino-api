@@ -1,10 +1,10 @@
 # This service will store different chains that help us query our LLM
 # A chain is sequence of actions that we can send to the LLM in one go.
 # LangCHAIN is all about building CHAINS that help us get good responses from the LLM
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_ollama import ChatOllama
 from langchain_classic.chains.conversation.base import ConversationChain
 from langchain_classic.memory import ConversationBufferWindowMemory
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama import ChatOllama
 
 # Define the LLM we're going to use (llama3.2:3b which we installed locally)
 llm = ChatOllama(
@@ -14,32 +14,51 @@ llm = ChatOllama(
 
 # Define the prompt we'll send to the LLM to define tone, context, and instructions
 prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are a helpful dinosaur assistant that answers questions about dinosaurs.
-     You have access to a database of dinosaur information, and you can use this information to answer questions about dinosaurs.
-     If you don't know the answer to a question, say you don't know, don't try to make up an answer.
-     You are also a Dinosaur, so every once in RAWR for fun!"""),
+    ("system",
+     """You are a helpful chatbot that answer questions about dinosaurs, paleontology, 
+    and general prehistoric queries. 
+    
+    You speak like an old crazy prospector who really loves fossils and dinosaurs.
+    You are kind and helpful, but tend to go off the rails and ramble a little bit. 
+    
+    You never answer questions that don't have to do with dinosaurs or prehistory.
+    You don't provide further suggestions beyond what the user asks."""),
     ("user", "{input}")
 ])
 
 # Our first basic chain - just combines the prompt and the LLM,
+# Returning something we can query!
 def get_basic_chain():
     # This basic chain was defined using LCEL (LangChain Expression Language)
     # The components in it are just the llm and prompt we defined above
     chain = prompt | llm
-    # print(chain) # Check out what the chain looks like in the console
     return chain # Return an invokable chain! Check it out in our langchain_ops router
 
-# sequential chain example - we can have multiple steps in a chain, and the output of one step can be the input of the next step
+# Sequential chain that adds an extra step in the to refine the initial response
 def get_sequential_chain():
+
+    # First chain - just a basic prompt to the LLM. Using the OG members from above
     draft_chain = prompt | llm
+
+    # Define a new prompt to help us refine the initial answer
+    # In this case, we want a more concise and professional answer. No crazy rambling
     refined_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a university professor of paleontology. You get responses from a helpful dinosaur assistant that answers questions about dinosaurs, and your job is to improve the responses by making them more detailed and informative."""),
+        ("system",
+         """You are a stoic and professional chatbot. 
+         You take raw LLM answers and refine them to be more concise and professional.
+         Format your text generation in 3 or less sentences. 
+         Share the refined answer, followed by the original answer"""),
         ("user", "{input}")
     ])
+
+    # Make the second chain using the refined prompt
     refined_chain = refined_prompt | llm
+
+    # Finally, the sequential part - combine the 2 chains and return the final chain!
     sequential_chain = draft_chain | refined_chain
     return sequential_chain
 
+# A Chain that stores memory so it can recall what was being talked about
 def get_memory_chain():
 
     # Create a memory object, an instance of ConversationBufferWindowMemory
@@ -54,10 +73,14 @@ def get_memory_chain():
     # Unfortunately, we will have to rewrite the prompt
     memory_prompt = ChatPromptTemplate.from_messages([
         ("system",
-         """You are a helpful dinosaur assistant that answers questions about dinosaurs.
-        You have access to a database of dinosaur information, and you can use this information to answer questions about dinosaurs.
-        If you don't know the answer to a question, say you don't know, don't try to make up an answer.
-        You are also a Dinosaur, so every once in RAWR for fun!"""),
+         """You are a helpful chatbot that answer questions about dinosaurs, paleontology, 
+        and general prehistoric queries. 
+        
+        You speak like an old crazy prospector who really loves fossils and dinosaurs.
+        You are kind and helpful, but tend to go off the rails and ramble a little bit. 
+        
+        You never answer questions that don't have to do with dinosaurs or prehistory.
+        You don't provide further suggestions beyond what the user asks."""),
         ("user", "Current input: {input},"
                  "Conversation history: {history}")
     ])
@@ -72,7 +95,3 @@ def get_memory_chain():
 
     # Return the chain with memory, invoked in the router endpoint
     return memory_chain
-    
-
-
-
