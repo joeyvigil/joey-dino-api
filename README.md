@@ -6,6 +6,8 @@ To run the app, use the following command in your terminal:
 
 ```bash
 uvicorn app.main:app --reload 
+or
+uvicorn app.main:app --reload --port 8001
 ```
 
 # Langchain notes

@@ -46,7 +46,8 @@ def route_node(state:GraphState) -> GraphState:
     if any(word in query for word in ["plan", "plans", "boss", "digs"]):
         return {"route":"plans"}
 
-    # TODO: route to general chat if no keywords get matched
+    # Route to general chat node if no keywords get matched
+    return {"route":"chat"}
 
 
 # Node that gets Dino data from VectorDB
@@ -94,6 +95,28 @@ def answer_with_docs(state:GraphState) -> GraphState:
     response = llm.invoke(prompt)
     return {"answer":response.text}
 
+# Here's the general chat node that we fall back to if the query isn't related to vector data
+def general_chat_node(state:GraphState) -> GraphState:
+
+    # Get the user's query from state
+    query = state.get("query", "")
+
+    # Define the prompt
+    prompt=(
+        f"""
+        You are a friendly chatbot that responds to general queries
+        Answer the user's query in a concise but thorough way
+        
+        User Query: {query}
+        Answer: 
+        """
+    )
+
+    # Return the invocation and store it in State
+    response = llm.invoke(prompt)
+    return {"answer":response.text}
+
+
 
 # =====================(END OF NODE DEFINITIONS)=======================
 
@@ -110,6 +133,7 @@ def build_graph():
     build.add_node("search_dinos", search_dinos)
     build.add_node("search_plans", search_plans)
     build.add_node("answer_with_docs", answer_with_docs)
+    build.add_node("general_chat", general_chat_node)
 
     # Set the node that starts the graph (router node in this case)
     build.set_entry_point("route")
@@ -125,15 +149,22 @@ def build_graph():
         # Map that connects the possible "route" values to the appropriate note
         {
             "dinos":"search_dinos",
-            "plans":"search_plans"
+            "plans":"search_plans",
+            "chat":"general_chat"
         }
     )
 
     # After either retrieval node, we ALWAYS want to go to the answer node
+    build.add_edge("search_dinos", "answer_with_docs")
+    build.add_edge("search_plans", "answer_with_docs")
 
     # Define potential terminal node (stopping points) for the graph
+    build.set_finish_point("answer_with_docs")
+    build.set_finish_point("general_chat")
 
     # Return the built graph!
-
+    return build.compile()
 
 # Make a single graph instance using the build_graph function
+# This is what we'll invoke in our endpoints!
+langgraph = build_graph()
